@@ -3,6 +3,7 @@ from os import path as p
 import numpy as np
 import pandas as pd
 import subprocess
+from shutil import copy, rmtree
 ###########################################################################################################
 def pdb2df(pdbFile):
     columns = ['ATOM', 'ATOM_ID', 'ATOM_NAME', 'RES_NAME',
@@ -135,60 +136,93 @@ def findCoreExterior(pdbFile,msmsDir,pdbDf,proteinName,outDir):
 
     return exteriorDf, coreDf
 ########################################################################################
-def get_counts_in_region(coreDf,extDf,pdbDf,proteinName,aminoAcidNames):
-    featuresDict={}
-    for region, df in zip(["core","ext","protein"],[coreDf,extDf,pdbDf]):
-        # initialise a features dataframe with column names
-        columnNames=[]
-        columnNames.append(f'{region}.total')
-        for aminoAcid in aminoAcidNames:
-            columnNames.append(f'{region}.{aminoAcid}')
-        for element in ["C","N","O"]:
-            columnNames.append(f'{region}.{element}')
-        columnNames=columnNames.sort()
-        countsDf = pd.DataFrame(columns=columnNames,index=[proteinName])
+def element_count_in_region(regionDf,regionName,proteinName):
+    ## INITIALISE ELEMENT COUNT DATAFRAME ##
+    columnNames=[]
+    for element in ["C","N","O","S"]:
+        columnNames.append(f"{regionName}.{element}")
+    elementCountDf = pd.DataFrame(columns=columnNames,index=[proteinName])
+    ## COUNT ELEMENTS IN REGION, RETURN ZERO IF REGION HAS NONE OR DOES NOT EXIST
+    for element in ["C","N","O","S"]:
+        try:
+            elementCountDf.loc[:,f'{regionName}.{element}'] = regionDf["ELEMENT"].value_counts()[element]
+        except:
+            elementCountDf.loc[:, f'{regionName}.{element}'] = 0
 
-        # count elements [Carbon, Nitrogen, Oxygen]
-        for element in ["C","N","O"]:
-            try:
-                countsDf.loc[:,f'{region}.{element}'] = df["ELEMENT"].value_counts()[element]
-            except:
-                countsDf.loc[:,f'{region}.{element}'] = 0
-        # get unique residues only
-        uniqueResDf= df.drop_duplicates(subset=["RES_SEQ"])
-        totalRes=0
-        # add get residue counts
-        for aminoAcid in aminoAcidNames:
-            if aminoAcid in df["RES_NAME"].unique():
-                countsDf.loc[:,f'{region}.{aminoAcid}'] = uniqueResDf["RES_NAME"].value_counts()[aminoAcid]
-            else:
-                countsDf.loc[:,f'{region}.{aminoAcid}'] = 0
-            totalRes+=countsDf[f'{region}.{aminoAcid}']
-        countsDf[f"{region}.total"] = totalRes
-        featuresDict.update({f'{region}.counts':countsDf})
-    return featuresDict
+    return elementCountDf
 ########################################################################################
-def get_properties_in_region(featuresDict, proteinName, aminoAcidNames, aminoAcidProperties):
-    # loop through three regions
-    for region in ["core","ext","protein"]:
-        # initialise dataframe with columnNames
-        columnNames=[]
-        for property in aminoAcidProperties.columns:
-            columnNames.append(f'{region}.{property}')
-        propertiesDf=pd.DataFrame(columns=columnNames,index=[proteinName])
-        # find count dataframe for corresponding region
-        countDf = featuresDict[f'{region}.counts']
-        for property in aminoAcidProperties:
-            propertyValue=0
-            for aminoAcid in aminoAcidNames:
-                aaCount = countDf.at[proteinName,f"{region}.{aminoAcid}"]
-                aaPropertyvalue = aminoAcidProperties.at[aminoAcid,property]
-                value = aaCount * aaPropertyvalue
-                propertyValue += value 
+def amino_acid_count_in_region(regionDf, regionName, proteinName, aminoAcidNames):
+    ## INITIALSE AMINO ACID COUNT DATAFRAME ##
+    columnNames=[]
+    for aminoAcid in aminoAcidNames:
+        columnNames.append(f"{regionName}.{aminoAcid}")
+    aaCountDf = pd.DataFrame(columns=columnNames,index=[proteinName])
 
-            totalAminoAcids=countDf.at[proteinName,f'{region}.total']
-            if not totalAminoAcids == 0:
-                propertyValue = propertyValue / totalAminoAcids
-            propertiesDf[f'{region}.{property}'] = propertyValue
-        featuresDict.update({f'{region}.properties':propertiesDf})
-    return featuresDict
+    ## GET UNIQUE RESIDUES ONLY ##
+    uniqueResiduesDf = regionDf.drop_duplicates(subset = ["RES_SEQ"])
+
+    ## COUNT AMINO ACIDS IN REGION, RETURN ZERO IF REGION HAS NONE OR DOES NOT EXIST
+    totalResidueCount = []
+    for aminoAcid in aminoAcidNames:
+        try: 
+            aaCountDf.loc[:,f'{regionName}.{aminoAcid}'] = uniqueResiduesDf["RES_NAME"].value_counts()[aminoAcid]
+        except:
+            aaCountDf.loc[:,f'{regionName}.{aminoAcid}'] = 0
+
+    aaCountDf.loc[:,f"{regionName}.total"] = aaCountDf.sum(axis=1)
+    return aaCountDf
+########################################################################################
+def calculate_amino_acid_properties_in_region(aaCountDf, aminoAcidNames, aminoAcidProperties, proteinName, regionName):
+    ## INITIALISE PROPERTIES DATAFRAME ##
+    columnNames = []
+    for property in aminoAcidProperties.columns:
+        columnNames.append(f"{regionName}.{property}")
+    propertiesDf = pd.DataFrame(columns=columnNames, index=[proteinName])
+    
+    ## LOOP THROUGH PROPERTIES SUPPLIED IN AMINO_ACID_TABLE.txt
+    for property in aminoAcidProperties:
+        propertyValue=0
+        for aminoAcid in aminoAcidNames:
+            try:
+                aaCount = aaCountDf.at[proteinName,f"{regionName}.{aminoAcid}"]
+            except KeyError:
+                aaCount = 0
+            aaPropertyvalue = aminoAcidProperties.at[aminoAcid,property]
+            value = aaCount * aaPropertyvalue
+            propertyValue += value 
+        try:
+            totalAminoAcids=aaCountDf.at[proteinName,f'{regionName}.total']
+        except KeyError:
+            totalAminoAcids=0
+        if not totalAminoAcids == 0:
+            propertyValue = propertyValue / totalAminoAcids
+        propertiesDf[f'{regionName}.{property}'] = propertyValue
+
+    return propertiesDf
+
+########################################################################################
+def gen_cave_region(outDir,pdbFile):
+    proteinName = p.splitext(p.basename(pdbFile))[0]
+
+    pocketDir = p.join(outDir,proteinName)
+    os.makedirs(pocketDir,exist_ok=True)
+    pocketPdb = p.join(pocketDir,f"{proteinName}.pdb")
+    copy(pdbFile,pocketPdb)
+
+    os.chdir(pocketDir)
+
+    minSphereSize = "3.0"
+    maxSphereSize = "6.0"
+    subprocess.call(["fpocket","-f",pocketPdb,"-m",minSphereSize,"-M",maxSphereSize],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    fpocketOutDir = p.join(pocketDir,f"{proteinName}_out","pockets")
+    ## ASSUMPTION == LARGEST POCKET IS OUR BINDING POCKET ## Not really true!
+    largestPocketPdb = p.join(fpocketOutDir,"pocket1_atm.pdb")
+    ## ERROR Handling
+    if not p.isfile(largestPocketPdb):
+        return
+    largestPocketDf = pdb2df(largestPocketPdb)
+    ## CLEAN UP POCKET DIR ##
+    rmtree(pocketDir)
+
+    return largestPocketDf

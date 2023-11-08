@@ -1,7 +1,7 @@
 def inputs():
     # directory information
-    inputDir = "/home/esp/featureGenerationMethods/coreFeatures/test_pdbs"
-    outDir = "/home/esp/featureGenerationMethods/coreFeatures/features"
+    inputDir = "/home/esp/featureGenerationMethods/caveFeatures/test_pdbs"
+    outDir = "/home/esp/featureGenerationMethods/caveFeatures/features"
 
     # msms exe locations
     msmsDir = "/home/esp/bin/MSMS"

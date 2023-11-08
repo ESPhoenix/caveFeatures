@@ -1,8 +1,9 @@
-# coreFeatures
+# caveFeatures
 
-**coreFeatures** is a feature generation method that leverages the program MSMS to separate a protein structure (supplied as a PDB file) into core and exterior regions.
+**caveFeatures** is a feature generation method that leverages the program MSMS to separate a protein structure (supplied as a PDB file) into core and exterior regions.
+**caveFeatures** also leverages the program fPocket to identify large pockets within proteins of interest, these are then treated as an additional "cave" region for feature generation.
 
-The following features are generated for each of these regions:
+The following features are generated for core, exterior and cave regions:
 
 - Element Counts
 - Amino Acid Counts
@@ -27,6 +28,12 @@ conda activate coreFeaturesEnv
 pip install argpass==0.0.2 numpy==1.21.6 pandas==1.3.5 tqdm==4.66.1
 ```
 
+## Install fpocket
+```bash
+conda config --add channels conda-forge
+conda install fpocket
+```
+
 ## Download and Install MSMS
 
 1. Download `msms_i86_64Linux2_2.6.1.tar.gz` from [MSMS Downloads](https://ccsb.scripps.edu/msms/downloads/).
@@ -37,7 +44,7 @@ pip install argpass==0.0.2 numpy==1.21.6 pandas==1.3.5 tqdm==4.66.1
 tar zxvf ~/bin/msms_i86_64Linux2_2.6.1.tar.gz
 ```
 
-## Configure the Environment
+## Edit the config script or make your own
 
 Edit the `config_coreFeatures.py` file as follows:
 
@@ -55,5 +62,6 @@ Now, you are ready to run coreFeatures
 ## Useage
 From the coreFeatures directory, run the following in the command line:
 ```bash
-python coreFeatures.py --config config_coreFeatures.py
+python coreFeatures.py --config config.py
 ```
+You may want to change the config file name to match your own config file
