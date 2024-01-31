@@ -4,36 +4,8 @@ import numpy as np
 import pandas as pd
 import subprocess
 from shutil import copy, rmtree
-###########################################################################################################
-def pdb2df(pdbFile):
-    columns = ['ATOM', 'ATOM_ID', 'ATOM_NAME', 'RES_NAME',
-                'CHAIN_ID', 'RES_SEQ', 'X', 'Y', 'Z',
-                'OCCUPANCY', 'TEMP_FACTOR', 'ELEMENT']
+from pdbUtils import *
 
-    data = []
-    with open(pdbFile, 'r') as pdb_file:
-        for line in pdb_file:
-            if line.startswith('ATOM') or line.startswith('HETATM'):
-                atom_type = line[0:6].strip()
-                atom_id = int(line[6:11].strip())
-                atom_name = line[12:16].strip()
-                res_name = line[17:20].strip()
-                chain_id = line[21:22].strip()
-                if chain_id == '':
-                    chain_id = None
-                res_seq = int(line[22:26].strip())
-                x = float(line[30:38].strip())
-                y = float(line[38:46].strip())
-                z = float(line[46:54].strip())
-                occupancy = float(line[54:60].strip())
-                temp_factor = float(line[60:66].strip())
-                element = line[76:78].strip()
-
-                data.append([atom_type, atom_id, atom_name, res_name,
-                              chain_id, res_seq, x, y, z, occupancy,
-                                temp_factor, element])
-
-    return pd.DataFrame(data, columns=columns)
 ###########################################################################################################
 def calculateEuclideanDistance(row, point):
     xDiff = row['X'] - point[0]
@@ -121,14 +93,14 @@ def findCoreExterior(pdbFile,msmsDir,pdbDf,proteinName,outDir):
     pdbDf = pd.concat([pdbDf,areaDf],axis=1)
 
     # Group by residue and calculate the average SES score
-    meanSesPerResidue = pdbDf.groupby('RES_SEQ')['SES'].mean()
+    meanSesPerResidue = pdbDf.groupby('RES_ID')['SES'].mean()
 
     # Get residue sequences with average SES > 1
     exteriorResiduesIndex = meanSesPerResidue[meanSesPerResidue > 1].index
 
     # Split the DataFrame based on average SES > 1
-    exteriorDf = pdbDf[pdbDf['RES_SEQ'].isin(exteriorResiduesIndex)]
-    coreDf = pdbDf[~pdbDf['RES_SEQ'].isin(exteriorResiduesIndex)]
+    exteriorDf = pdbDf[pdbDf['RES_ID'].isin(exteriorResiduesIndex)]
+    coreDf = pdbDf[~pdbDf['RES_ID'].isin(exteriorResiduesIndex)]
 
     # clean up
     os.remove(xyzrFile)
@@ -159,7 +131,7 @@ def amino_acid_count_in_region(regionDf, regionName, proteinName, aminoAcidNames
     aaCountDf = pd.DataFrame(columns=columnNames,index=[proteinName])
 
     ## GET UNIQUE RESIDUES ONLY ##
-    uniqueResiduesDf = regionDf.drop_duplicates(subset = ["RES_SEQ"])
+    uniqueResiduesDf = regionDf.drop_duplicates(subset = ["RES_ID"])
 
     ## COUNT AMINO ACIDS IN REGION, RETURN ZERO IF REGION HAS NONE OR DOES NOT EXIST
     totalResidueCount = []

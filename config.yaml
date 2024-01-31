@@ -1,0 +1,4 @@
+inputDir: "/home/esp/scriptDevelopment/caveFeatures/test_pdbs"
+outDir: "/home/esp/scriptDevelopment/caveFeatures/test_pdbs"
+msmsDir: "/home/esp/bin/MSMS"
+aminoAcidTable: "/home/esp/scriptDevelopment/caveFeatures/amino_acid_properties.txt"

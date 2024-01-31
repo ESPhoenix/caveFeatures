@@ -8,41 +8,33 @@ import argpass
 import multiprocessing
 import glob
 from tqdm import tqdm
+import yaml
 ## SPECIFIC CAVEFEATURES FUNCTIONS ##
 from util_caveFeatures import *
+from pdbUtils import *
 
 ########################################################################################
-########################################################################################
 def read_inputs():
-    ## MAKE A PARSER THAT ACCEPTS --CONFIG TAG ##
+    ## create an argpass parser, read config file, snip off ".py" if on the end of file
     parser = argpass.ArgumentParser()
     parser.add_argument("--config")
     args = parser.parse_args()
-    configName=args.config
-    if  args.config == None:
-        print('No config file name provided.')
-        exit()
-    ## DEAL WITH .PY EXTENSION ##
-    configName = p.splitext(configName)[0]
 
-    ## ADD CONFIG FILE TO PYTHONPATH ##
-    cwd = os.getcwd()
-    configPath = p.join(cwd,configName)
-    sys.path.append(configPath)
-    # IMPORT CONFIG FILE AND RETURN INPUT VARIABLES ##
-    try:
-        config_module = __import__(configName)
-        inputDir, outDir, msmsDir, aminoAcidTable = config_module.inputs()
-        return inputDir, outDir, msmsDir, aminoAcidTable
-    except ImportError:
-        print(f"Error: Can't to import module '{configName}'. Make sure the input exists!")
-        print("HOPE IS THE FIRST STEP ON THE ROAD TO DISAPPOINTMENT")
-        exit()
+    config=args.config
+    ## Read config.yaml into a dictionary
+    with open(config,"r") as yamlFile:
+        config = yaml.safe_load(yamlFile) 
+    inputDir = config["inputDir"]
+    outDir = config["outDir"]
+    msmsDir = config["msmsDir"]
+    aminoAcidTable = config["aminoAcidTable"]
+
+    return inputDir, outDir, msmsDir, aminoAcidTable 
 
 ########################################################################################
 def process_pdbs_worker(pdbFile, outDir, aminoAcidNames, aminoAcidProperties, msmsDir, pdbDir):
     proteinName = p.splitext(p.basename(pdbFile))[0]
-    pdbDf = pdb2df(pdbFile=pdbFile)
+    pdbDf = pdb2df(pdbFile)
     exteriorDf, coreDf = findCoreExterior(pdbFile=pdbFile, pdbDf=pdbDf,
                                           proteinName=proteinName, msmsDir=msmsDir,
                                           outDir=outDir)
@@ -110,7 +102,7 @@ def process_pdbs(pdbList, outDir, aminoAcidNames, aminoAcidProperties, msmsDir,p
 ########################################################################################
 def main():
     # load user inputs
-    inputDir, outDir, msmsDir,aminoAcidTable = read_inputs()
+    inputDir, outDir, msmsDir, aminoAcidTable = read_inputs()
     os.makedirs(outDir, exist_ok=True)
     # initialise amino acid data
     aminoAcidNames, aminoAcidProperties = initialiseAminoAcidInformation(aminoAcidTable)
