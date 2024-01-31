@@ -173,7 +173,7 @@ def calculate_amino_acid_properties_in_region(aaCountDf, aminoAcidNames, aminoAc
     return propertiesDf
 
 ########################################################################################
-def gen_cave_region(outDir,pdbFile):
+def gen_multiple_cave_regions(outDir,pdbFile):
     proteinName = p.splitext(p.basename(pdbFile))[0]
 
     pocketDir = p.join(outDir,proteinName)
@@ -188,13 +188,16 @@ def gen_cave_region(outDir,pdbFile):
     subprocess.call(["fpocket","-f",pocketPdb,"-m",minSphereSize,"-M",maxSphereSize],
                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     fpocketOutDir = p.join(pocketDir,f"{proteinName}_out","pockets")
-    ## ASSUMPTION == LARGEST POCKET IS OUR BINDING POCKET ## Not really true!
-    largestPocketPdb = p.join(fpocketOutDir,"pocket1_atm.pdb")
-    ## ERROR Handling
-    if not p.isfile(largestPocketPdb):
-        return
-    largestPocketDf = pdb2df(largestPocketPdb)
+    ## TAKE ALL POCKETS!
+    pocketDfs = []
+    for file in os.listdir(fpocketOutDir):
+        if not p.splitext(file)[1] == ".pdb":
+            continue
+        pocketPdb = p.join(fpocketOutDir,file)
+        pocketDf = pdb2df(pocketPdb)
+        pocketDfs.append(pocketDf)
+
     ## CLEAN UP POCKET DIR ##
     rmtree(pocketDir)
 
-    return largestPocketDf
+    return pocketDfs
